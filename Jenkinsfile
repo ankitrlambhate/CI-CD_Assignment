@@ -21,12 +21,11 @@ pipeline {
     environment {
         AWS_REGION            = 'ap-south-1'
         SERVICES              = 'auth streaming admin chat frontend'
-        SNS_TOPIC_ARN         = ''                       // optional (bonus ChatOps)
+        SNS_TOPIC_ARN         = 'arn:aws:sns:ap-south-1:235063678427:streamingapp-alerts'                       // optional (bonus ChatOps)
         IMAGE_TAG             = "${env.BUILD_NUMBER}"
  
         // Makes compose name images "streamingapp-<service>"
         COMPOSE_PROJECT_NAME  = 'streamingapp'
- 
         AWS_ACCESS_KEY_ID     = credentials('ankit-aws-access-key-id')
         AWS_SECRET_ACCESS_KEY = credentials('ankit-aws-secret-access-key')
         AWS_DEFAULT_REGION    = 'ap-south-1'
