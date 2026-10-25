@@ -52,7 +52,24 @@ pipeline {
  
                   docker --version || { echo "Docker is not available to Jenkins on this server."; exit 1; }
                   docker info >/dev/null 2>&1 || { echo "Jenkins cannot talk to the Docker daemon."; exit 1; }
-                  docker compose version || { echo "'docker compose' plugin missing on this server."; exit 1; }
+                  # Compose wrapper: use the docker plugin, then docker-compose, else download a standalone binary
+                  cat > "$WORKSPACE/bin/compose" <<'EOF'
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "$0")" && pwd)"
+if docker compose version >/dev/null 2>&1; then exec docker compose "$@"; fi
+if command -v docker-compose >/dev/null 2>&1; then exec docker-compose "$@"; fi
+exec "$DIR/docker-compose-bin" "$@"
+EOF
+                  chmod +x "$WORKSPACE/bin/compose"
+ 
+                  if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
+                    echo "No Docker Compose found - downloading standalone binary into the workspace"
+                    curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+                      -o "$WORKSPACE/bin/docker-compose-bin" \
+                      || { echo "Could not download Docker Compose (network blocked?)."; exit 1; }
+                    chmod +x "$WORKSPACE/bin/docker-compose-bin"
+                  fi
+                  "$WORKSPACE/bin/compose" version
  
                   if ! command -v aws >/dev/null 2>&1; then
                     curl -sSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
@@ -95,7 +112,12 @@ pipeline {
  
         stage('Build Images') {
             steps {
-                sh 'docker compose build'
+                sh '''
+                  export PATH="$WORKSPACE/bin:$PATH"
+                  # compose may require an env file; fall back to the example values for the build
+                  [ -f .env ] || { [ -f .env.example ] && cp .env.example .env; } || true
+                  compose build
+                '''
             }
         }
  
